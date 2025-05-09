@@ -1,54 +1,53 @@
 # -----------------------------------------------------------------------------
 # src/emafusion/cli.py
 # -----------------------------------------------------------------------------
-"""Typer‑based CLI entry‑point."""
+"""Typer‑based CLI entry‑point for quick experiments."""
+from __future__ import annotations
+
+import asyncio
+import json
 import pathlib
-import typer
-from rich import print
+import uuid
+from typing import List
 
-from .config import load_config
-from .router import TaxonomyRouter, LearnedRouter
+import typer  # type: ignore
+
 from .cascade import Cascade
-from .datasets import load_dataset
+from .config import Settings
+from .datasets import load_jsonl
 
-app = typer.Typer(add_completion=False)
+app = typer.Typer(add_help_option=True)
 
 
 @app.command()
 def run(
-    config: pathlib.Path = typer.Argument(..., exists=True, help="Path to YAML config"),
-    dataset: str = typer.Option(None, help="Built‑in dataset name (jsonl under datasets/)."),
-    prompt_file: pathlib.Path = typer.Option(None, help="Path to custom prompts JSONL."),
+    config: pathlib.Path = typer.Argument(..., exists=True),
+    prompts: pathlib.Path = typer.Argument(..., exists=True),
+    out: pathlib.Path = typer.Option("results.jsonl"),
 ):
-    """Run EMAFusion pipeline on dataset or prompt file."""
-    if (dataset is None) == (prompt_file is None):
-        typer.echo("Provide exactly one of --dataset or --prompt-file.")
-        raise typer.Exit(code=1)
+    """Run cascade on **prompts** and dump answers → **out** (JSONL)."""
 
-    cfg = load_config(config)
+    cfg: Settings = Settings.load(config)
+    cascade: Cascade = Cascade.from_config(cfg)
+    prompt_list: List[dict] = load_jsonl(prompts)
 
-    # Routers --------------------------------------------------------------
-    tax_router = TaxonomyRouter(cfg.taxonomy_index)
-    lrn_router = LearnedRouter(cfg.learned_ckpt)
+    async def _process() -> None:  # noqa: D401
+        with out.open("w") as fh:
+            for item in prompt_list:
+                answer = await cascade.answer(item["prompt"])
+                fh.write(
+                    json.dumps(
+                        {
+                            "id": uuid.uuid4().hex,
+                            "prompt": item["prompt"],
+                            "answer": answer,
+                        }
+                    )
+                    + "\n"
+                )
 
-    cascade = Cascade.from_config(cfg)
-
-    samples = load_dataset(dataset) if dataset else _load_jsonl(prompt_file)
-    for item in samples:
-        prompt = item["prompt"] if isinstance(item, dict) else item
-        model_name = tax_router.route(prompt)
-        # If taxonomy says "ambiguous" fallback to learned
-        if model_name == "ambiguous":
-            model_name = lrn_router.predict(prompt)
-        typer.echo(f"[bold cyan]→ Selecting base model:[/] {model_name}")
-        answer = cascade.answer(prompt)
-        print(answer)
-
-
-def _load_jsonl(path: pathlib.Path):
-    return [json.loads(l) for l in path.read_text().splitlines()]
+    asyncio.run(_process())
 
 
-if __name__ == "__main__":  # pragma: no cover
+if __name__ == "__main__":
     app()
-    

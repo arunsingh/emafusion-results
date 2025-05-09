@@ -2,49 +2,51 @@
 # src/emafusion/judge.py
 # -----------------------------------------------------------------------------
 """Answer quality judges – ensemble or single‑LLM (paper§5)."""
+"""Confidence‑scoring judges for draft answers."""
 from __future__ import annotations
 
+import asyncio
 import os
 from typing import Protocol
 
-try:
-    import openai
-except ImportError:  # optional, users might rely on local judge
-    openai = None  # type: ignore
+import openai  # type: ignore
 
 
 class Judge(Protocol):
-    """Return confidence ∈ [0,1] for <prompt, answer>."""
+    """Generic scoring interface."""
 
-    def score(self, prompt: str, draft: str) -> float:  # pragma: no cover – interface only
-        ...
+    async def score(self, prompt: str, draft: str) -> float:  # noqa: D401 simple docstring OK
+        """Return confidence ∈ [0,1]."""
 
 
 class LLMJudge:
-    """Default implementation using OpenAI chat‑completion log‑probs."""
+    """LLM‑based grader. One API call → returns a float confidence."""
 
-    def __init__(self, model: str = "gpt-3.5-turbo-0125"):
-        if openai is None:
-            raise RuntimeError("openai‑python not installed; cannot use LLMJudge.")
-        self.model = model
-        openai.api_key = os.getenv("OPENAI_API_KEY")
-        if openai.api_key is None:
-            raise EnvironmentError("OPENAI_API_KEY not set.")
+    def __init__(self, model: str):
+        openai.api_key = os.getenv("OPENAI_API_KEY", "")
+        self._model = model
 
-    def score(self, prompt: str, draft: str) -> float:
-        # Very light‑weight: ask model if answer is correct on 3‑level scale → map to [0,1]
-        sys_msg = (
-            "You are an impartial grader. Answer only with a number: 1 (correct), 0.5 (uncertain), 0 (incorrect)."
+    async def score(self, prompt: str, draft: str) -> float:  # noqa: D401
+        completion = await openai.ChatCompletion.acreate(
+            model=self._model,
+            temperature=0,
+            max_tokens=4,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Act as a strict grader. Return **only** a float between 0 and 1 "
+                        "representing how correct and complete the answer is."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": f"Prompt:\n{prompt}\n\nAnswer:\n{draft}\n\nScore:",
+                },
+            ],
         )
-        user_msg = f"Question: {prompt}\nModel answer: {draft}\nScore:"
-        resp = openai.chat.completions.create(
-            model=self.model,
-            messages=[{"role": "system", "content": sys_msg}, {"role": "user", "content": user_msg}],
-            max_tokens=1,
-            temperature=0.0,
-        )
-        content = resp.choices[0].message.content.strip()
+        content = completion.choices[0].message.content.strip()
         try:
-            return float(content)
+            return max(0.0, min(1.0, float(content)))
         except ValueError:
             return 0.0

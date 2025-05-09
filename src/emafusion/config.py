@@ -21,40 +21,54 @@ YAML schema::
   thresholds:
     confidence: 0.6
 """
+"""Configuration dataclasses and helpers."""
 from __future__ import annotations
 
+import json
 import pathlib
-from dataclasses import dataclass
-from typing import List, Dict, Any
+from dataclasses import dataclass, field
+from typing import Dict, List
 
-import yaml
+import yaml  # type: ignore
 
 
-@dataclass
+@dataclass(slots=True)
 class ModelCfg:
-    name: str
-    provider: str  # "openai" | "ollama" | "vertexai" …
-    price_prompt: float  # USD per 1k tokens
-    price_completion: float  # USD per 1k tokens
-    max_tokens: int = 4096
+    """Per‑model runtime metadata."""
+
+    name: str  # Friendly label, e.g. "llama3-8b-local"
+    provider: str  # "openai", "ollama", "together", etc.
+    engine: str  # Underlying model identifier
+    cost: float | None = None  # $ /1k tokens (optional)
 
 
-@dataclass
+@dataclass(slots=True)
 class Settings:
+    """Cascade + judge configuration loaded from YAML/JSON."""
+
     models: List[ModelCfg]
-    taxonomy_index: pathlib.Path
-    learned_ckpt: pathlib.Path
-    judge_model: str
-    thresholds: Dict[str, float]
+    judge_model: str = "gpt-3.5-turbo"
+    thresholds: Dict[str, float] = field(default_factory=dict)
 
+    # ------------------------------------------------------------------
+    # I/O helpers
+    # ------------------------------------------------------------------
+    @classmethod
+    def load(cls, path: str | pathlib.Path) -> "Settings":  # noqa: D401 – simple docstring
+        """Read **path** (YAML/JSON) into a :class:`Settings` instance."""
 
-def load_config(path: str | pathlib.Path) -> Settings:
-    data: Dict[str, Any] = yaml.safe_load(pathlib.Path(path).read_text())
-    models = [ModelCfg(**m) for m in data["models"]]
-    return Settings(
-        models=models,
-        taxonomy_index=pathlib.Path(data["taxonomy_index"]),
-        learned_ckpt=pathlib.Path(data["learned_ckpt"]),
-        judge_model=data["judge_model"],
-        thresholds=data.get("thresholds", {"confidence": 0.6}),
-    )
+        path = pathlib.Path(path)
+        if not path.exists():
+            raise FileNotFoundError(path)
+
+        if path.suffix in {".yaml", ".yml"}:
+            data = yaml.safe_load(path.read_text())
+        else:
+            data = json.loads(path.read_text())
+
+        models = [ModelCfg(**m) for m in data["models"]]
+        return cls(
+            models=models,
+            judge_model=data.get("judge_model", "gpt-3.5-turbo"),
+            thresholds=data.get("thresholds", {}),
+        )

@@ -2,18 +2,15 @@
 # src/emafusion/datasets.py
 # -----------------------------------------------------------------------------
 """Utility loaders for evaluation datasets (GSM8K, ARC, etc.)."""
+"""Helper for loading JSONL prompt files."""
 from __future__ import annotations
 
 import json
-import pathlib
-from typing import List, Dict
-
-_DATA_DIR = pathlib.Path("datasets")
+from pathlib import Path
+from typing import Any, Dict, List
 
 
-def load_dataset(name: str) -> List[Dict]:
-    """Return list of {prompt, answer} dicts."""
-    path = _DATA_DIR / f"{name}.jsonl"
+def load_jsonl(path: Path) -> List[Dict[str, Any]]:  # noqa: D401 – simple docstring
     if not path.exists():
         raise FileNotFoundError(path)
-    return [json.loads(l) for l in path.read_text().splitlines()]
+    return [json.loads(line) for line in path.read_text().splitlines()]
