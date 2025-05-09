@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 """Run EMAFusion experiment from YAML config."""
-import typer, yaml, json, uuid, pathlib
+import typer
+import yaml 
+import json 
+import uuid
+import pathlib
 from emafusion import Cascade
 app = typer.Typer()
 
