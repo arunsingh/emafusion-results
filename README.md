@@ -38,3 +38,9 @@ emafusion run scripts/cascade_config.yaml examples/quick_prompt.json
 | `notebooks/`         | Exploratory analysis of result logs                      |
 | `tests/`             | Pytest unit tests (coverage ≥ 90 %)                      |
 | `.github/workflows/` | CI (lint → type-check → test → docker-build)             |
+
+
+## Contributing in the Project
+- Fork → Feature branch → PR.
+- Make sure pytest -q passes and pre-commit run --all-files is green.
+- All code changes require a matching docstring + type hints.

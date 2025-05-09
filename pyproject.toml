@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name            = "emafusion"
+version         = "0.1.0"
+description     = "Toolkit to reproduce EMAFusion LLM routing/fusion results"
+authors         = [{ name = "Arun Singh", email = "arunsingh.in@gmail.com" }]
+license         = { text = "MIT" }
+readme          = "README.md"
+requires-python = ">=3.9"
+dependencies    = [
+    "numpy",
+    "pydantic>=2",
+    "typer[all]>=0.12",
+    "sentence-transformers",
+    "scikit-learn",
+    "tqdm",
+    "pandas",
+    "openai>=1.0",          # or ollama-python
+    "rich",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "ruff",
+    "mypy",
+    "pre-commit",
+    "mkdocs-material",
+]
+
+[project.scripts]
+emafusion = "emafusion.cli:app"

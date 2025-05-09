@@ -1,0 +1,8 @@
+site_name: EMAFusion Results
+repo_url: https://github.com/arunsingh/emafusion-results
+theme:
+  name: material
+nav:
+  - Home: index.md
+  - Usage: usage.md
+plugins: [search]
