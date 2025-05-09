@@ -1,0 +1,5 @@
+# charts/emafusion/Chart.yaml
+apiVersion: v2
+name: emafusion
+version: 0.1.0
+appVersion: "0.1.0"
