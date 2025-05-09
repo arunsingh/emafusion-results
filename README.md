@@ -28,6 +28,39 @@ emafusion run scripts/cascade_config.yaml examples/quick_prompt.json
 ```
 
 
+## EmaFusion High Level architecture
+
+```bash
+           ┌─────────────┐
+ Prompt →──► Taxonomy    │
+           │  Router     │───► cheap-model-1 ┐
+           └────┬────────┘                   │
+                │  “Seen this before”        ▼
+                │                    ┌────────────────┐
+                ▼                    │ Multi-Judge    │
+           ┌─────────────┐           │ Confidence     │
+           │ Learned      │          │ Assessment     │
+           │  Router      │──────────┤  (LLMs + RM)   │
+           └────┬────────┘           └────────────────┘
+                │ “Ambiguous / novel”         ▲
+                └─────────────────────────────┘
+                                 if confidence < τ
+                                 escalate up the cascade
+                                 (model-2 → … → GPT-4-class)
+
+           When two or more drafts survive,
+           ───────────────────────────────────
+                         │
+                         ▼
+                 ┌─────────────┐
+                 │  Fusion     │  (rank, vote, or blend)
+                 └─────────────┘
+                         │
+                         ▼
+                    Final answer
+
+```
+
 ## Repo structure
 
 | Path                 | What’s inside                                            |
